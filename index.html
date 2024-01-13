@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollama Speech</title>
+</head>
+
+<body>
+    <div id="result"></div>
+
+    <script>
+        // Define the request body
+        var requestBody = JSON.stringify({
+            "model": "llama2",
+            "messages": [{
+                "role": "user",
+                "content": "Hello",
+            }]
+        });
+
+        // Send the request using Fetch API
+        fetch("http://localhost:11434/api/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: requestBody
+        })
+        .then(async response => {
+            console.log("Text:", response);
+            const json = await response.json();
+            console.log("JSON:", json);
+            // Update the <div> with the response
+            document.getElementById("result").innerText = json["message"]["content"];
+            return json;
+        })
+        .catch(error => {
+            console.error("Error:", error);
+            document.getElementById("result").innerHTML = "Error: " + error;
+        });
+    </script>
+</body>
+
+</html>
