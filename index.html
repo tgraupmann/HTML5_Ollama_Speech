@@ -9,6 +9,7 @@
 
 <body>
     <div>Testing using the Ollama REST API.</div>
+    <pre id="resultText" style="display: none"></pre>
     <div id="result"></div>
 
     <script>
@@ -30,12 +31,28 @@
             body: requestBody
         })
         .then(async response => {
-            console.log("Text:", response);
-            const json = await response.json();
+            let text = await response.text();
+            //console.log("Text:", text);
+            // replace newlines with commas
+            text = text.split("\n").join(',');
+            if (text.endsWith(',')) {
+                // remove trailing comma
+                text = text.substring(0, text.length - 1);
+            }
+            // add brackets to make into array
+            text = '[' + text + ']';
+            document.getElementById("resultText").innerText = JSON.stringify(JSON.parse(text), null, 2);
+            return text;
+        })
+        .then(text => {
+            const json = JSON.parse(text);
             console.log("JSON:", json);
-            // Update the <div> with the response
-            document.getElementById("result").innerText = json["message"]["content"];
-            return json;
+            // combine messages into one string
+            let content = 'A: ';
+            for (let i = 0; i < json.length; i++) {
+                content += json[i]["message"]["content"];
+            }
+            document.getElementById("result").innerText = content;
         })
         .catch(error => {
             console.error("Error:", error);
