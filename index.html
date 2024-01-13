@@ -8,56 +8,151 @@
 </head>
 
 <body>
-    <div>Testing using the Ollama REST API.</div>
+    <div>Talk to the Ollama REST API. Speak the word "prompt" as the wake word.</div>
     <pre id="resultText" style="display: none"></pre>
-    <div id="result"></div>
-
+    <div id="txtError"></div>
+    <div id="ollamaPrompt"></div>
+    <div id="ollamaResponse"></div>
     <script>
-        // Define the request body
-        var requestBody = JSON.stringify({
-            "model": "llama2",
-            "messages": [{
-                "role": "user",
-                "content": "Hello",
-            }]
-        });
 
-        // Send the request using Fetch API
-        fetch("http://localhost:11434/api/chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: requestBody
-        })
-        .then(async response => {
-            let text = await response.text();
-            //console.log("Text:", text);
-            // replace newlines with commas
-            text = text.split("\n").join(',');
-            if (text.endsWith(',')) {
-                // remove trailing comma
-                text = text.substring(0, text.length - 1);
+        function debugLog(msg) {
+            console.log(msg);
+        }
+
+        function showError(msg) {
+            debugLog(msg);
+            txtError.innerText = msg;
+        }
+
+        function setup() {
+
+            window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!window.SpeechRecognition) {
+                showError('Speech Recognition is not supported by your browser!');
+                return;
             }
-            // add brackets to make into array
-            text = '[' + text + ']';
-            document.getElementById("resultText").innerText = JSON.stringify(JSON.parse(text), null, 2);
-            return text;
-        })
-        .then(text => {
-            const json = JSON.parse(text);
-            //console.log("JSON:", json);
-            // combine messages into one string
-            let content = 'A: ';
-            for (let i = 0; i < json.length; i++) {
-                content += json[i]["message"]["content"];
+
+            const recognition = new SpeechRecognition();
+            if (!recognition) {
+                showError('Could not instantiate SpeechRecognition!');
+                return;
             }
-            document.getElementById("result").innerText = content;
-        })
-        .catch(error => {
-            console.error("Error:", error);
-            document.getElementById("result").innerHTML = "Error: " + error;
-        });
+            debugLog('Instantiated SpeechRecognition');
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+            debugLog('SpeechRecognition: Set default language');
+
+            recognition.addEventListener('result', e => {
+
+                const results = Array.from(e.results);
+                if (!results) {
+                    return;
+                }
+                let jsonData = {};
+                jsonData.results = [];
+                for (let resultIndex = 0; resultIndex < results.length; ++resultIndex) {
+                    //console.log(results[resultIndex]);
+                    // SpeechRecognitionResult
+                    let speechRecognitionResult = {};
+                    speechRecognitionResult.isFinal = results[resultIndex].isFinal;
+                    speechRecognitionResult.alternatives = [];
+                    for (let setIndex = 0; setIndex < results[resultIndex].length; ++setIndex) {
+                        //console.log(results[resultIndex][setIndex]);
+                        // SpeechRecognitionAlternative
+                        let speechRecognitionAlternative = {};
+                        speechRecognitionAlternative.confidence = results[resultIndex][setIndex].confidence;
+                        speechRecognitionAlternative.transcript = results[resultIndex][setIndex].transcript;
+                        speechRecognitionResult.alternatives.push(speechRecognitionAlternative);
+                    }
+                    speechRecognitionResult.length = speechRecognitionResult.alternatives.length;
+                    jsonData.results.push(speechRecognitionResult);
+                }
+                //debugLog(JSON.stringify(jsonData, null, 2));
+
+                const transcript = Array.from(e.results)
+                    .map(result => result[0])
+                    .map(result => result.transcript)
+                    .join('');
+
+                if (e.results[0].isFinal && transcript && transcript.length > 0) {
+                    const WAKE_WORD = 'prompt';
+                    let index = transcript.toLocaleLowerCase().indexOf(WAKE_WORD);
+                    if (index < 0) {
+                        debugLog('WAKE WORD NOT DETECTED!');
+                        return;
+                    }
+                    //debugLog('WAKE WORD DETECTED!');
+                    const input = transcript.substring(index + WAKE_WORD.length);
+                    debugLog(input);
+                    if (input) {
+                        ollamaPrompt.innerText = 'Q: ' + input;
+                        ollamaResponse.innerText = 'A: ...';
+
+                        // Define the request body
+                        var requestBody = JSON.stringify({
+                            "model": "llama2",
+                            "messages": [{
+                                "role": "user",
+                                "content": input,
+                            }]
+                        });
+
+                        // Send the request using Fetch API
+                        fetch("http://localhost:11434/api/chat", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: requestBody
+                        })
+                            .then(async response => {
+                                let text = await response.text();
+                                //console.log("Text:", text);
+                                // replace newlines with commas
+                                text = text.split("\n").join(',');
+                                if (text.endsWith(',')) {
+                                    // remove trailing comma
+                                    text = text.substring(0, text.length - 1);
+                                }
+                                // add brackets to make into array
+                                text = '[' + text + ']';
+                                document.getElementById("resultText").innerText = JSON.stringify(JSON.parse(text), null, 2);
+                                return text;
+                            })
+                            .then(text => {
+                                const json = JSON.parse(text);
+                                //console.log("JSON:", json);
+                                // combine messages into one string
+                                let content = '';
+                                for (let i = 0; i < json.length; i++) {
+                                    content += json[i]["message"]["content"];
+                                }
+                                if (!content) {
+                                    ollamaResponse.innerText = 'A: nothing';
+                                } else {
+                                    ollamaResponse.innerText = 'A: ' + content;
+                                }
+                            })
+                            .catch(error => {
+                                console.error("Error:", error);
+                                document.getElementById("result").innerHTML = "Error: " + error;
+                            });
+                    }
+                }
+            });
+
+            recognition.addEventListener('end', recognition.start);
+
+            if (recognition.start) {
+                debugLog('SpeechRecognition has a start method');
+                recognition.start();
+                debugLog('SpeechRecognition: invoked start method');
+            } else {
+                debugLog('SpeechRecognition does not have a start method!');
+            }
+        }
+
+        setup();
     </script>
 </body>
 
