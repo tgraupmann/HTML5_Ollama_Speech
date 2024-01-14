@@ -179,7 +179,14 @@
                                             utterance.pitch = 1;
 
                                             speechSynthesis.speak(utterance);
-                                            await sleep(4000);
+
+                                            var inProgress = true;
+                                            utterance.addEventListener('end', function() {
+                                                inProgress = false;
+                                            });
+                                            while (inProgress) {
+                                                await sleep(100);
+                                            }
                                         }
                                     }
                                 }
