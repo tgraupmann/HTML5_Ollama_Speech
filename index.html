@@ -9,11 +9,16 @@
 
 <body>
     <div>Talk to the Ollama REST API. Speak the word "prompt" as the wake word.</div>
+    <select id="voicesDropdown" style="min-height: 40px; min-width: 500px;">
+        <option value="">Select a voice</option>
+    </select>
     <pre id="resultText" style="display: none"></pre>
     <div id="txtError"></div>
     <div id="ollamaPrompt"></div>
     <div id="ollamaResponse"></div>
     <script>
+
+        var speechSynthesisVoices = [];
 
         function debugLog(msg) {
             console.log(msg);
@@ -24,7 +29,7 @@
             txtError.innerText = msg;
         }
 
-        function setup() {
+        function setupSpeechRecognition() {
 
             window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!window.SpeechRecognition) {
@@ -74,17 +79,23 @@
                     .map(result => result.transcript)
                     .join('');
 
+                const WAKE_WORD = 'prompt';
+                let index = transcript.toLocaleLowerCase().indexOf(WAKE_WORD);
+                if (index >= 0) {
+                    ollamaPrompt.innerHTML = '<div style="color: green; font-weight: bold; font-size: 1.25em">Q: Prompting... ' + transcript.substring(index) + '</div>';
+                    ollamaResponse.innerText = 'A: ...';
+                }
+
                 if (e.results[0].isFinal && transcript && transcript.length > 0) {
-                    const WAKE_WORD = 'prompt';
                     let index = transcript.toLocaleLowerCase().indexOf(WAKE_WORD);
                     if (index < 0) {
-                        debugLog('WAKE WORD NOT DETECTED!');
+                        //debugLog('WAKE WORD NOT DETECTED!');
                         return;
                     }
                     //debugLog('WAKE WORD DETECTED!');
                     const input = transcript.substring(index + WAKE_WORD.length);
-                    debugLog(input);
                     if (input) {
+                        debugLog(input);
                         ollamaPrompt.innerText = 'Q: ' + input;
                         ollamaResponse.innerText = 'A: ...';
 
@@ -131,6 +142,26 @@
                                     ollamaResponse.innerText = 'A: nothing';
                                 } else {
                                     ollamaResponse.innerText = 'A: ' + content;
+
+                                    const speechSynthesis = window.speechSynthesis;
+                                    if (speechSynthesis) {
+                                        const utterance = new SpeechSynthesisUtterance();
+                                        utterance.text = content;
+                                        if (voicesDropdown.selectedIndex > 0) {
+                                            const voice = speechSynthesisVoices[voicesDropdown.selectedIndex];
+                                            utterance.lang = voice.lang;
+                                            utterance.localService = voice.localService;
+                                            utterance.name = voice.name;
+                                            utterance.voiceURI = voice.voiceURI;
+                                        } else {
+                                            utterance.lang = 'en-US';
+                                        }
+                                        utterance.volume = 1;
+                                        utterance.rate = 1;
+                                        utterance.pitch = 1;
+
+                                        speechSynthesis.speak(utterance);
+                                    }
                                 }
                             })
                             .catch(error => {
@@ -148,8 +179,43 @@
                 recognition.start();
                 debugLog('SpeechRecognition: invoked start method');
             } else {
-                debugLog('SpeechRecognition does not have a start method!');
+                showError('SpeechRecognition does not have a start method!');
             }
+        }
+
+        function setupSpeechSynthesis() {
+
+            const speechSynthesis = window.speechSynthesis;
+            if (!speechSynthesis) {
+                showError('Speech Synthesis is not supported by your browser!');
+                return;
+            }
+
+            if (speechSynthesis.getVoices) {
+                setTimeout(function () {
+                    speechSynthesisVoices = speechSynthesis.getVoices();
+                    //console.log('speechSynthesisVoices', speechSynthesisVoices);
+
+                    voicesDropdown.innerHTML = speechSynthesisVoices
+                        .map(voice => `<option value="${voice.voiceURI}">${voice.name} (${voice.lang})</option>`)
+                        .join('');
+
+                    for (let i = 0; i < speechSynthesisVoices.length; i++) {
+                        if (speechSynthesisVoices[i].lang === 'en-US') {
+                            voicesDropdown.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }, 100);
+            }
+        }
+
+        function setup() {
+
+            setupSpeechRecognition();
+
+            setupSpeechSynthesis();
+
         }
 
         setup();
