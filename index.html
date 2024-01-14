@@ -29,6 +29,10 @@
             txtError.innerText = msg;
         }
 
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
         function setupSpeechRecognition() {
 
             window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -130,7 +134,7 @@
                                 document.getElementById("resultText").innerText = JSON.stringify(JSON.parse(text), null, 2);
                                 return text;
                             })
-                            .then(text => {
+                            .then(async text => {
                                 const json = JSON.parse(text);
                                 //console.log("JSON:", json);
                                 // combine messages into one string
@@ -145,22 +149,38 @@
 
                                     const speechSynthesis = window.speechSynthesis;
                                     if (speechSynthesis) {
-                                        const utterance = new SpeechSynthesisUtterance();
-                                        utterance.text = content;
-                                        if (voicesDropdown.selectedIndex > 0) {
-                                            const voice = speechSynthesisVoices[voicesDropdown.selectedIndex];
-                                            utterance.lang = voice.lang;
-                                            utterance.localService = voice.localService;
-                                            utterance.name = voice.name;
-                                            utterance.voiceURI = voice.voiceURI;
-                                        } else {
-                                            utterance.lang = 'en-US';
-                                        }
-                                        utterance.volume = 1;
-                                        utterance.rate = 1;
-                                        utterance.pitch = 1;
+                                        let words = content.split(' ');
+                                        while (words.length > 0) {
+                                            let sentence = [];
+                                            for (let w = 0; w < 20; w++) {
+                                                if (words.length == 0) {
+                                                    break;
+                                                }
+                                                const word = words[0];
+                                                sentence.push(word);
+                                                //console.log('word', word);
+                                                words.shift();
+                                            }
+                                            let output = sentence.join(' ');
+                                            console.log('speak:', output);
+                                            const utterance = new SpeechSynthesisUtterance();
+                                            utterance.text = output;
+                                            if (voicesDropdown.selectedIndex > 0) {
+                                                const voice = speechSynthesisVoices[voicesDropdown.selectedIndex];
+                                                utterance.lang = voice.lang;
+                                                utterance.localService = voice.localService;
+                                                utterance.name = voice.name;
+                                                utterance.voiceURI = voice.voiceURI;
+                                            } else {
+                                                utterance.lang = 'en-US';
+                                            }
+                                            utterance.volume = 1;
+                                            utterance.rate = 1;
+                                            utterance.pitch = 1;
 
-                                        speechSynthesis.speak(utterance);
+                                            speechSynthesis.speak(utterance);
+                                            await sleep(4000);
+                                        }
                                     }
                                 }
                             })
