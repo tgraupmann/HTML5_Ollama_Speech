@@ -45,15 +45,15 @@
                     <button>pin</button>
                     <button @click="handleDeleteHistoryItem(index)">delete</button>
                 </div>
-                <input type="text" style="width: 100%; margin: 5px; padding: 10px; background: #ffd; border: solid 1px black" :value="item.input"></input>
-                <div style="width: 100%; background: #dfd; border: solid 1px black">{{ item.output }}</div>
+                <input type="text" style="margin: 5px; padding: 10px; background: #ffd; border: solid 1px black" :value="item.input"></input>
+                <textarea ref="txtHistoryOutput" disabled cols="80" style="width: auto; height: auto; background: #dfd; border: solid 1px black">{{ item.output }}</textarea>
             </div>
         </div>
         <div class="div-row center"
             style="border: solid 1px black; margin: 20px; background: #eee; padding: 10px; gap: 10px">
             <div>Prompt:</div>
             <input type="text" style="background: #fdd; border: solid 1px red; width: 100%; padding: 10px"
-                :value="currentInput" @input="handleTextInput"></input>
+                :value="currentInput" @input="handleTextInput" v-on:keyup.enter="sendToOllama(currentInput)"></input>
             <button style="background: #dfd; margin: 0px; padding: 10px;" @click="sendToOllama(currentInput)">Send</button>
         </div>
     </div>
@@ -68,6 +68,12 @@
                 ollamaInput: '',
             },
             methods: {
+                resizeTextAreaHistory(index) {
+                    var refThis = this;
+                    setTimeout(function() {
+                        refThis.$refs['txtHistoryOutput'][index].style.height = refThis.$refs['txtHistoryOutput'][index].scrollHeight + 'px';
+                    }, 0);
+                },
                 handleDeleteHistoryItem(index) {
                     this.history.splice(index, 1);
                 },
@@ -127,12 +133,14 @@
                                 });
                                 refThis.currentInput = '';
                                 refThis.ollamaInput = '';
+                                refThis.resizeTextAreaHistory(refThis.history.length - 1);
                                 return;
                             } else {
                                 refThis.history.push({
                                     input: refThis.ollamaInput,
                                     output: content,
                                 });
+                                refThis.resizeTextAreaHistory(refThis.history.length - 1);
                                 refThis.currentInput = '';
                                 refThis.ollamaInput = '';
 
