@@ -20,6 +20,15 @@
             justify-content: center;
             align-items: center;
         }
+
+        .button {
+            background: #4CAF50;
+            color: white;
+            text-align: center;
+            min-height: 50px;
+            max-height: 50px;
+            padding: 10px;
+        }
     </style>
     <script defer src="fontawesome/all.js"></script>
     <!-- import JavaScript for Vue -->
@@ -40,14 +49,33 @@
         <div class="div-col" style="margin: 20px">
             <div>History:</div>
             <div v-for="(item, index) in history" :index="index" class="div-row center"
-                style="justify-content: space-between; border: solid 1px black; background: #ddd; gap: 20px">
-                <div class="div-row" style="flex-wrap: nowrap">
-                    <button @click="handleDeleteHistoryItem(index)">delete</button>
+                style="align-items: flex-start; justify-content: center; border: solid 1px black; background: #ddd; padding: 20px; gap: 20px">
+                <div class="div-col">
+                    <div class="div-row center">
+                        <button class="button" style="background: red" @click="handleDeleteHistoryItem(index)"><i class="fa fa-trash" aria-hidden="true"></i></button>
+                        <button class="button" @click="sendToOllama(item.input)">Send</button>
+                        <button class="button" @click="speak(item.output)">Play</button>
+                        <button class="button" @click="cancelSpeaking()">Stop</button>
+                    </div>
+                    <div class="div-row">
+                        <input type="text"
+                            style="margin: 5px; padding: 10px; width: 100%; background: #ffd; border: solid 1px black"
+                            :value="item.input"></input>
+                    </div>
+                    <div class="div-row">
+                        <textarea ref="txtHistoryOutput" disabled cols="120" rows="5"
+                            style="width: 100%; height: auto; background: #ddf; border: solid 1px black">{{ item.output }}</textarea>
+                    </div>
                 </div>
-                <input type="text" style="margin: 5px; padding: 10px; width: 50%; background: #ffd; border: solid 1px black"
-                    :value="item.input"></input>
-                <textarea ref="txtHistoryOutput" disabled cols="80"
-                    style="width: 50%; height: auto; background: #dfd; border: solid 1px black">{{ item.output }}</textarea>
+            </div>
+            <div v-for="(content, index) in pendingPrompts" :index="index" class="div-row center"
+                style="align-items: center; border: solid 1px black; background: #ffd; padding: 20px; gap: 20px">
+                <div>{{ content }} </div>
+                <div class="div-row center" style="margin: 20px">
+                    <!-- BEGIN: Loading Animation -->
+                    <div><i class="fas fa-spinner fa-spin"></i></div>
+                </div>
+                <!-- END: Loading Animation -->
             </div>
         </div>
         <div class="div-row center"
@@ -55,8 +83,8 @@
             <div>Prompt:</div>
             <input type="text" style="background: #fdd; border: solid 1px red; width: 100%; padding: 10px"
                 :value="currentInput" @input="handleTextInput" v-on:keyup.enter="sendToOllama(currentInput)"></input>
-            <button style="background: #dfd; margin: 0px; padding: 10px;"
-                @click="sendToOllama(currentInput)">Send</button>
+            <button class="button" @click="sendToOllama(currentInput)">Send</button>
+            <button class="button" @click="cancelSpeaking()">Stop</button>
         </div>
     </div>
     <script>
@@ -67,8 +95,8 @@
                 speechSynthesisVoices: [],
                 currentInput: '',
                 history: [],
-                ollamaInput: '',
                 abortSpeaking: false,
+                pendingPrompts: [],
             },
             methods: {
                 resizeTextAreaHistory(index) {
@@ -83,13 +111,17 @@
                 handleTextInput(event) {
                     this.currentInput = event.target.value;
                 },
-                sendToOllama(input) {
-                    var refThis = this;
-                    refThis.currentInput = '';
-
-                    const speechSynthesis = window.speechSynthesis;
-
+                isSpeaking() {
                     if (speechSynthesis && speechSynthesis.speaking) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                },
+                cancelSpeaking() {
+                    var refThis = this;
+                    const speechSynthesis = window.speechSynthesis;
+                    if (refThis.isSpeaking()) {
                         refThis.abortSpeaking = true;
                         setTimeout(function () {
                             refThis.abortSpeaking = false;
@@ -98,12 +130,77 @@
                             speechSynthesis.cancel();
                         }
                     }
+                },
+                async speak(content) {
+                    if (this.isSpeaking()) {
+                        this.cancelSpeaking();
+                        await sleep(250);
+                    }
+                    if (speechSynthesis) {
+                        let words = content.split(' ');
+                        while (words.length > 0) {
+                            let sentence = [];
+                            for (let w = 0; w < 20; w++) {
+                                if (words.length == 0) {
+                                    break;
+                                }
+                                const word = words[0];
+                                sentence.push(word);
+                                //console.log('word', word);
+                                words.shift();
+                            }
+
+                            if (this.abortSpeaking) {
+                                console.log('Skip speaking early');
+                                return;
+                            }
+
+                            let output = sentence.join(' ');
+                            console.log('speak:', output);
+                            const utterance = new SpeechSynthesisUtterance();
+                            utterance.text = output;
+                            if (voicesDropdown.selectedIndex > 0) {
+                                const voice = this.speechSynthesisVoices[voicesDropdown.selectedIndex];
+                                utterance.lang = voice.lang;
+                                utterance.localService = voice.localService;
+                                utterance.name = voice.name;
+                                utterance.voiceURI = voice.voiceURI;
+                            } else {
+                                utterance.lang = 'en-US';
+                            }
+                            utterance.volume = 1;
+                            utterance.rate = 1;
+                            utterance.pitch = 1;
+
+                            speechSynthesis.speak(utterance);
+
+                            var inProgress = true;
+                            utterance.addEventListener('end', function () {
+                                inProgress = false;
+                            });
+                            while (inProgress) {
+                                if (this.abortSpeaking) {
+                                    console.log('Skip speaking');
+                                    return;
+                                }
+                                await sleep(100);
+                            }
+                        }
+                    }
+                },
+                sendToOllama(input) {
+                    var refThis = this;
+                    refThis.currentInput = '';
+
+                    const speechSynthesis = window.speechSynthesis;
+
+                    refThis.cancelSpeaking();
 
                     if (!input) {
                         return;
                     }
 
-                    refThis.ollamaInput = input;
+                    refThis.pendingPrompts.push(input);
 
                     // manipulate the chat history
                     let messages = [];
@@ -135,7 +232,16 @@
                         body: requestBody
                     })
                         .then(async response => {
+
                             let text = await response.text();
+
+                            for (let i = 0; i < refThis.pendingPrompts.length; ++i) {
+                                if (refThis.pendingPrompts[i] === input) {
+                                    refThis.pendingPrompts.splice(i, 1);
+                                    break;
+                                }
+                            }
+
                             //console.log("Text:", text);
                             // replace newlines with commas
                             text = text.split("\n").join(',');
@@ -158,73 +264,19 @@
                             }
                             if (!content) {
                                 refThis.history.push({
-                                    input: refThis.ollamaInput,
+                                    input: input,
                                     output: '(empty response)',
                                 });
-                                refThis.currentInput = '';
-                                refThis.ollamaInput = '';
                                 refThis.resizeTextAreaHistory(refThis.history.length - 1);
                                 return;
                             } else {
                                 refThis.history.push({
-                                    input: refThis.ollamaInput,
+                                    input: input,
                                     output: content,
                                 });
                                 refThis.resizeTextAreaHistory(refThis.history.length - 1);
-                                refThis.currentInput = '';
-                                refThis.ollamaInput = '';
 
-                                if (speechSynthesis) {
-                                    let words = content.split(' ');
-                                    while (words.length > 0) {
-                                        let sentence = [];
-                                        for (let w = 0; w < 20; w++) {
-                                            if (words.length == 0) {
-                                                break;
-                                            }
-                                            const word = words[0];
-                                            sentence.push(word);
-                                            //console.log('word', word);
-                                            words.shift();
-                                        }
-
-                                        if (refThis.abortSpeaking) {
-                                            console.log('Skip speaking early');
-                                            return;
-                                        }
-
-                                        let output = sentence.join(' ');
-                                        console.log('speak:', output);
-                                        const utterance = new SpeechSynthesisUtterance();
-                                        utterance.text = output;
-                                        if (voicesDropdown.selectedIndex > 0) {
-                                            const voice = refThis.speechSynthesisVoices[voicesDropdown.selectedIndex];
-                                            utterance.lang = voice.lang;
-                                            utterance.localService = voice.localService;
-                                            utterance.name = voice.name;
-                                            utterance.voiceURI = voice.voiceURI;
-                                        } else {
-                                            utterance.lang = 'en-US';
-                                        }
-                                        utterance.volume = 1;
-                                        utterance.rate = 1;
-                                        utterance.pitch = 1;
-
-                                        speechSynthesis.speak(utterance);
-
-                                        var inProgress = true;
-                                        utterance.addEventListener('end', function () {
-                                            inProgress = false;
-                                        });
-                                        while (inProgress) {
-                                            if (refThis.abortSpeaking) {
-                                                console.log('Skip speaking');
-                                                return;
-                                            }
-                                            await sleep(100);
-                                        }
-                                    }
-                                }
+                                refThis.speak(content);
                             }
                         })
                         .catch(error => {
