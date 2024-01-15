@@ -42,11 +42,12 @@
             <div v-for="(item, index) in history" :index="index" class="div-row center"
                 style="justify-content: space-between; border: solid 1px black; background: #ddd; gap: 20px">
                 <div class="div-row" style="flex-wrap: nowrap">
-                    <button>pin</button>
                     <button @click="handleDeleteHistoryItem(index)">delete</button>
                 </div>
-                <input type="text" style="margin: 5px; padding: 10px; background: #ffd; border: solid 1px black" :value="item.input"></input>
-                <textarea ref="txtHistoryOutput" disabled cols="80" style="width: auto; height: auto; background: #dfd; border: solid 1px black">{{ item.output }}</textarea>
+                <input type="text" style="margin: 5px; padding: 10px; width: 50%; background: #ffd; border: solid 1px black"
+                    :value="item.input"></input>
+                <textarea ref="txtHistoryOutput" disabled cols="80"
+                    style="width: 50%; height: auto; background: #dfd; border: solid 1px black">{{ item.output }}</textarea>
             </div>
         </div>
         <div class="div-row center"
@@ -54,7 +55,8 @@
             <div>Prompt:</div>
             <input type="text" style="background: #fdd; border: solid 1px red; width: 100%; padding: 10px"
                 :value="currentInput" @input="handleTextInput" v-on:keyup.enter="sendToOllama(currentInput)"></input>
-            <button style="background: #dfd; margin: 0px; padding: 10px;" @click="sendToOllama(currentInput)">Send</button>
+            <button style="background: #dfd; margin: 0px; padding: 10px;"
+                @click="sendToOllama(currentInput)">Send</button>
         </div>
     </div>
     <script>
@@ -66,11 +68,12 @@
                 currentInput: '',
                 history: [],
                 ollamaInput: '',
+                abortSpeaking: false,
             },
             methods: {
                 resizeTextAreaHistory(index) {
                     var refThis = this;
-                    setTimeout(function() {
+                    setTimeout(function () {
                         refThis.$refs['txtHistoryOutput'][index].style.height = refThis.$refs['txtHistoryOutput'][index].scrollHeight + 'px';
                     }, 0);
                 },
@@ -81,19 +84,46 @@
                     this.currentInput = event.target.value;
                 },
                 sendToOllama(input) {
+                    var refThis = this;
+                    refThis.currentInput = '';
+
+                    const speechSynthesis = window.speechSynthesis;
+
+                    if (speechSynthesis && speechSynthesis.speaking) {
+                        refThis.abortSpeaking = true;
+                        setTimeout(function () {
+                            refThis.abortSpeaking = false;
+                        }, 250);
+                        if (speechSynthesis && speechSynthesis.cancel) {
+                            speechSynthesis.cancel();
+                        }
+                    }
+
                     if (!input) {
                         return;
                     }
-                    var refThis = this;
-                    this.ollamaInput = input;
+
+                    refThis.ollamaInput = input;
+
+                    // manipulate the chat history
+                    let messages = [];
+                    for (let i = 0; i < refThis.history.length; ++i) {
+                        messages.push({
+                            "role": "user",
+                            "content": refThis.history[i].input,
+                        });
+                    }
+                    messages.push({
+                        "role": "user",
+                        "content": input,
+                    });
+
+                    //console.log('Message Body', JSON.stringify(messages, null, 2));
 
                     // Define the request body
                     var requestBody = JSON.stringify({
                         "model": "llama2",
-                        "messages": [{
-                            "role": "user",
-                            "content": input,
-                        }]
+                        "messages": messages
                     });
 
                     // Send the request using Fetch API
@@ -144,7 +174,6 @@
                                 refThis.currentInput = '';
                                 refThis.ollamaInput = '';
 
-                                const speechSynthesis = window.speechSynthesis;
                                 if (speechSynthesis) {
                                     let words = content.split(' ');
                                     while (words.length > 0) {
@@ -158,6 +187,12 @@
                                             //console.log('word', word);
                                             words.shift();
                                         }
+
+                                        if (refThis.abortSpeaking) {
+                                            console.log('Skip speaking early');
+                                            return;
+                                        }
+
                                         let output = sentence.join(' ');
                                         console.log('speak:', output);
                                         const utterance = new SpeechSynthesisUtterance();
@@ -182,6 +217,10 @@
                                             inProgress = false;
                                         });
                                         while (inProgress) {
+                                            if (refThis.abortSpeaking) {
+                                                console.log('Skip speaking');
+                                                return;
+                                            }
                                             await sleep(100);
                                         }
                                     }
