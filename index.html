@@ -5,18 +5,187 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ollama Speech Interface</title>
+    <style>
+        .div-col {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .div-row {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .center {
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+    <script defer src="fontawesome/all.js"></script>
+    <!-- import JavaScript for Vue -->
+    <script src="vue/vue.js"></script>
+    <script src="vue/index.js"></script>
+    <script src="vue/en.js"></script>
 </head>
 
 <body>
-    <div>Talk to the Ollama REST API. Speak the word "prompt" as the wake word.</div>
-    <select id="voicesDropdown" style="min-height: 40px; min-width: 500px;">
-        <option value="">Select a voice</option>
-    </select>
-    <pre id="resultText" style="display: none"></pre>
-    <div id="txtError"></div>
-    <div id="ollamaPrompt"></div>
-    <div id="ollamaResponse"></div>
+    <div id="app">
+        <div>Talk to the Ollama REST API. Speak the word "prompt" as the wake word.</div>
+        <select id="voicesDropdown" style="min-height: 40px; min-width: 500px;">
+            <option v-if="speechSynthesisVoices.length == 0" value="">Select a voice</option>
+            <option v-for="item in speechSynthesisVoices" :value="item.voiceURI">{{ item.name }} ({{ item.lang }})
+            </option>
+        </select>
+        <div id="txtError"></div>
+        <div class="div-col" style="margin: 20px">
+            <div>History:</div>
+            <div v-for="(item, index) in history" :index="index" class="div-row center"
+                style="justify-content: space-between; border: solid 1px black; background: #ddd; gap: 20px">
+                <div class="div-row" style="flex-wrap: nowrap">
+                    <button>pin</button>
+                    <button @click="handleDeleteHistoryItem(index)">delete</button>
+                </div>
+                <input type="text" style="width: 100%; margin: 5px; padding: 10px; background: #ffd; border: solid 1px black" :value="item.input"></input>
+                <div style="width: 100%; background: #dfd; border: solid 1px black">{{ item.output }}</div>
+            </div>
+        </div>
+        <div class="div-row center"
+            style="border: solid 1px black; margin: 20px; background: #eee; padding: 10px; gap: 10px">
+            <div>Prompt:</div>
+            <input type="text" style="background: #fdd; border: solid 1px red; width: 100%; padding: 10px"
+                :value="currentInput" @input="handleTextInput"></input>
+            <button style="background: #dfd; margin: 0px; padding: 10px;" @click="sendToOllama(currentInput)">Send</button>
+        </div>
+    </div>
     <script>
+
+        vue = new Vue({
+            el: '#app',
+            data: {
+                speechSynthesisVoices: [],
+                currentInput: '',
+                history: [],
+                ollamaInput: '',
+            },
+            methods: {
+                handleDeleteHistoryItem(index) {
+                    this.history.splice(index, 1);
+                },
+                handleTextInput(event) {
+                    this.currentInput = event.target.value;
+                },
+                sendToOllama(input) {
+                    if (!input) {
+                        return;
+                    }
+                    var refThis = this;
+                    this.ollamaInput = input;
+
+                    // Define the request body
+                    var requestBody = JSON.stringify({
+                        "model": "llama2",
+                        "messages": [{
+                            "role": "user",
+                            "content": input,
+                        }]
+                    });
+
+                    // Send the request using Fetch API
+                    fetch("http://localhost:11434/api/chat", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: requestBody
+                    })
+                        .then(async response => {
+                            let text = await response.text();
+                            //console.log("Text:", text);
+                            // replace newlines with commas
+                            text = text.split("\n").join(',');
+                            if (text.endsWith(',')) {
+                                // remove trailing comma
+                                text = text.substring(0, text.length - 1);
+                            }
+                            // add brackets to make into array
+                            text = '[' + text + ']';
+                            //debugLog(JSON.stringify(JSON.parse(text), null, 2));
+                            return text;
+                        })
+                        .then(async text => {
+                            const json = JSON.parse(text);
+                            //console.log("JSON:", json);
+                            // combine messages into one string
+                            let content = '';
+                            for (let i = 0; i < json.length; i++) {
+                                content += json[i]["message"]["content"];
+                            }
+                            if (!content) {
+                                refThis.history.push({
+                                    input: refThis.ollamaInput,
+                                    output: '(empty response)',
+                                });
+                                refThis.currentInput = '';
+                                refThis.ollamaInput = '';
+                                return;
+                            } else {
+                                refThis.history.push({
+                                    input: refThis.ollamaInput,
+                                    output: content,
+                                });
+                                refThis.currentInput = '';
+                                refThis.ollamaInput = '';
+
+                                const speechSynthesis = window.speechSynthesis;
+                                if (speechSynthesis) {
+                                    let words = content.split(' ');
+                                    while (words.length > 0) {
+                                        let sentence = [];
+                                        for (let w = 0; w < 20; w++) {
+                                            if (words.length == 0) {
+                                                break;
+                                            }
+                                            const word = words[0];
+                                            sentence.push(word);
+                                            //console.log('word', word);
+                                            words.shift();
+                                        }
+                                        let output = sentence.join(' ');
+                                        console.log('speak:', output);
+                                        const utterance = new SpeechSynthesisUtterance();
+                                        utterance.text = output;
+                                        if (voicesDropdown.selectedIndex > 0) {
+                                            const voice = refThis.speechSynthesisVoices[voicesDropdown.selectedIndex];
+                                            utterance.lang = voice.lang;
+                                            utterance.localService = voice.localService;
+                                            utterance.name = voice.name;
+                                            utterance.voiceURI = voice.voiceURI;
+                                        } else {
+                                            utterance.lang = 'en-US';
+                                        }
+                                        utterance.volume = 1;
+                                        utterance.rate = 1;
+                                        utterance.pitch = 1;
+
+                                        speechSynthesis.speak(utterance);
+
+                                        var inProgress = true;
+                                        utterance.addEventListener('end', function () {
+                                            inProgress = false;
+                                        });
+                                        while (inProgress) {
+                                            await sleep(100);
+                                        }
+                                    }
+                                }
+                            }
+                        })
+                        .catch(error => {
+                            showError("Error: " + error);
+                        });
+                },
+            },
+        });
 
         var speechSynthesisVoices = [];
 
@@ -83,13 +252,9 @@
                     .map(result => result.transcript)
                     .join('');
 
-                const WAKE_WORD = 'prompt';
-                let index = transcript.toLocaleLowerCase().indexOf(WAKE_WORD);
-                if (index >= 0) {
-                    ollamaPrompt.innerHTML = '<div style="color: green; font-weight: bold; font-size: 1.25em">Q: Prompting... ' + transcript.substring(index) + '</div>';
-                    ollamaResponse.innerText = 'A: ...';
-                }
+                vue.currentInput = transcript;
 
+                const WAKE_WORD = 'prompt';
                 if (e.results[0].isFinal && transcript && transcript.length > 0) {
                     let index = transcript.toLocaleLowerCase().indexOf(WAKE_WORD);
                     if (index < 0) {
@@ -99,102 +264,8 @@
                     //debugLog('WAKE WORD DETECTED!');
                     const input = transcript.substring(index + WAKE_WORD.length);
                     if (input) {
-                        debugLog(input);
-                        ollamaPrompt.innerText = 'Q: ' + input;
-                        ollamaResponse.innerText = 'A: ...';
 
-                        // Define the request body
-                        var requestBody = JSON.stringify({
-                            "model": "llama2",
-                            "messages": [{
-                                "role": "user",
-                                "content": input,
-                            }]
-                        });
-
-                        // Send the request using Fetch API
-                        fetch("http://localhost:11434/api/chat", {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json"
-                            },
-                            body: requestBody
-                        })
-                            .then(async response => {
-                                let text = await response.text();
-                                //console.log("Text:", text);
-                                // replace newlines with commas
-                                text = text.split("\n").join(',');
-                                if (text.endsWith(',')) {
-                                    // remove trailing comma
-                                    text = text.substring(0, text.length - 1);
-                                }
-                                // add brackets to make into array
-                                text = '[' + text + ']';
-                                document.getElementById("resultText").innerText = JSON.stringify(JSON.parse(text), null, 2);
-                                return text;
-                            })
-                            .then(async text => {
-                                const json = JSON.parse(text);
-                                //console.log("JSON:", json);
-                                // combine messages into one string
-                                let content = '';
-                                for (let i = 0; i < json.length; i++) {
-                                    content += json[i]["message"]["content"];
-                                }
-                                if (!content) {
-                                    ollamaResponse.innerText = 'A: nothing';
-                                } else {
-                                    ollamaResponse.innerText = 'A: ' + content;
-
-                                    const speechSynthesis = window.speechSynthesis;
-                                    if (speechSynthesis) {
-                                        let words = content.split(' ');
-                                        while (words.length > 0) {
-                                            let sentence = [];
-                                            for (let w = 0; w < 20; w++) {
-                                                if (words.length == 0) {
-                                                    break;
-                                                }
-                                                const word = words[0];
-                                                sentence.push(word);
-                                                //console.log('word', word);
-                                                words.shift();
-                                            }
-                                            let output = sentence.join(' ');
-                                            console.log('speak:', output);
-                                            const utterance = new SpeechSynthesisUtterance();
-                                            utterance.text = output;
-                                            if (voicesDropdown.selectedIndex > 0) {
-                                                const voice = speechSynthesisVoices[voicesDropdown.selectedIndex];
-                                                utterance.lang = voice.lang;
-                                                utterance.localService = voice.localService;
-                                                utterance.name = voice.name;
-                                                utterance.voiceURI = voice.voiceURI;
-                                            } else {
-                                                utterance.lang = 'en-US';
-                                            }
-                                            utterance.volume = 1;
-                                            utterance.rate = 1;
-                                            utterance.pitch = 1;
-
-                                            speechSynthesis.speak(utterance);
-
-                                            var inProgress = true;
-                                            utterance.addEventListener('end', function() {
-                                                inProgress = false;
-                                            });
-                                            while (inProgress) {
-                                                await sleep(100);
-                                            }
-                                        }
-                                    }
-                                }
-                            })
-                            .catch(error => {
-                                console.error("Error:", error);
-                                document.getElementById("result").innerHTML = "Error: " + error;
-                            });
+                        vue.sendToOllama(input);
                     }
                 }
             });
@@ -220,15 +291,11 @@
 
             if (speechSynthesis.getVoices) {
                 setTimeout(function () {
-                    speechSynthesisVoices = speechSynthesis.getVoices();
+                    vue.speechSynthesisVoices = speechSynthesis.getVoices();
                     //console.log('speechSynthesisVoices', speechSynthesisVoices);
 
-                    voicesDropdown.innerHTML = speechSynthesisVoices
-                        .map(voice => `<option value="${voice.voiceURI}">${voice.name} (${voice.lang})</option>`)
-                        .join('');
-
-                    for (let i = 0; i < speechSynthesisVoices.length; i++) {
-                        if (speechSynthesisVoices[i].lang === 'en-US') {
+                    for (let i = 0; i < vue.speechSynthesisVoices.length; i++) {
+                        if (vue.speechSynthesisVoices[i].lang === 'en-US') {
                             voicesDropdown.selectedIndex = i;
                             break;
                         }
