@@ -6,6 +6,6 @@
 
 ## Dependencies
 
-* Ollama REST API
+* [Ollama](https://ollama.ai) REST API
 
-* Browser (Chrome Recommended)
+* Browser ([Chrome](https://www.google.com/chrome/) Recommended)
