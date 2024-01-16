@@ -6,6 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ollama Speech Interface</title>
     <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 1em;
+            background: #ddd;
+        }
+
         .div-col {
             display: flex;
             flex-direction: column;
@@ -29,6 +35,10 @@
             max-height: 50px;
             padding: 10px;
         }
+
+        .bold {
+            font-weight: bold;
+        }
     </style>
     <script defer src="fontawesome/all.js"></script>
     <!-- import JavaScript for Vue -->
@@ -39,52 +49,65 @@
 
 <body>
     <div id="app">
-        <div>Talk to the Ollama REST API. Speak the word "prompt" as the wake word.</div>
-        <select id="voicesDropdown" style="min-height: 40px; min-width: 500px;">
-            <option v-if="speechSynthesisVoices.length == 0" value="">Select a voice</option>
-            <option v-for="item in speechSynthesisVoices" :value="item.voiceURI">{{ item.name }} ({{ item.lang }})
-            </option>
-        </select>
         <div id="txtError"></div>
-        <div class="div-col" style="margin: 20px">
-            <div>History:</div>
-            <div v-for="(item, index) in history" :index="index" class="div-row center"
-                style="align-items: flex-start; justify-content: center; border: solid 1px black; background: #ddd; padding: 20px; gap: 20px">
-                <div class="div-col">
-                    <div class="div-row center">
-                        <button class="button" style="background: red" @click="handleDeleteHistoryItem(index)"><i class="fa fa-trash" aria-hidden="true"></i></button>
-                        <button class="button" @click="sendToOllama(item.input)">Send</button>
-                        <button class="button" @click="speak(item.output)">Play</button>
+        <div class="div-col center">
+            <div class="div-col center">
+                <div class="div-row center" style="margin: 10px; background: #eee; padding: 10px; border: solid 1px black; gap: 20px">
+                    <div class="bold">VOICE</div>
+                    <select id="voicesDropdown" style="min-height: 40px; min-width: 500px;">
+                        <option v-if="speechSynthesisVoices.length == 0" value="">Select a voice</option>
+                        <option v-for="item in speechSynthesisVoices" :value="item.voiceURI">{{ item.name }} ({{
+                            item.lang }})
+                        </option>
+                    </select>
+                </div>
+                <div v-if="history.length > 0" class="div-col center" style="margin: 10px; background: #dde; padding: 10px; border: solid 1px black">
+                    <div class="bold">HISTORY</div>
+                    <div v-for="(item, index) in history" :index="index" class="div-row center"
+                        style="align-items: flex-start; justify-content: center; border: solid 1px black; background: #eee; margin: 10px; padding: 20px; gap: 20px">
+                        <div class="div-col">
+                            <div class="div-row center">
+                                <button class="button" style="background: red"
+                                    @click="handleDeleteHistoryItem(index)"><i class="fa fa-trash"
+                                        aria-hidden="true"></i></button>
+                                <button class="button" @click="sendToOllama(item.input)">Send</button>
+                                <button class="button" @click="speak(item.output)">Play</button>
+                                <button class="button" @click="cancelSpeaking()">Stop</button>
+                            </div>
+                            <div class="div-row">
+                                <input type="text"
+                                    style="margin: 5px; padding: 10px; width: 100%; background: #ffd; border: solid 1px black"
+                                    :value="item.input"></input>
+                            </div>
+                            <div class="div-row">
+                                <textarea ref="txtHistoryOutput" disabled cols="120" rows="5"
+                                    style="width: 100%; height: auto; padding: 20px; background: #1f1f1f; color: #ddd; border: solid 1px black">{{ item.output }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div v-for="(content, index) in pendingPrompts" :index="index" class="div-row center"
+                    style="align-items: center; border: solid 1px black; background: #ffd; padding: 20px; gap: 20px">
+                    <div>{{ content }} </div>
+                    <div class="div-row center" style="margin: 20px">
+                        <!-- BEGIN: Loading Animation -->
+                        <div><i class="fas fa-spinner fa-spin"></i></div>
+                    </div>
+                    <!-- END: Loading Animation -->
+                </div>
+                <div class="div-col center" style="margin: 10px; background: #eee; padding: 10px; border: solid 1px black">
+                    <div style="background: #ffd; font-size: 0.75em">Talk to the Ollama REST API. Speak the word "prompt" as
+                        the wake word.</div>
+                    <div class="div-row center" style="padding: 10px; gap: 10px">
+                        <div class="bold">PROMPT</div>
+                        <input type="text" style="background: #fdd; border: solid 1px red; min-width: 500px; padding: 10px"
+                            :value="currentInput" @input="handleTextInput"
+                            v-on:keyup.enter="sendToOllama(currentInput)"></input>
+                        <button class="button" @click="sendToOllama(currentInput)">Send</button>
                         <button class="button" @click="cancelSpeaking()">Stop</button>
                     </div>
-                    <div class="div-row">
-                        <input type="text"
-                            style="margin: 5px; padding: 10px; width: 100%; background: #ffd; border: solid 1px black"
-                            :value="item.input"></input>
-                    </div>
-                    <div class="div-row">
-                        <textarea ref="txtHistoryOutput" disabled cols="120" rows="5"
-                            style="width: 100%; height: auto; background: #ddf; border: solid 1px black">{{ item.output }}</textarea>
-                    </div>
                 </div>
             </div>
-            <div v-for="(content, index) in pendingPrompts" :index="index" class="div-row center"
-                style="align-items: center; border: solid 1px black; background: #ffd; padding: 20px; gap: 20px">
-                <div>{{ content }} </div>
-                <div class="div-row center" style="margin: 20px">
-                    <!-- BEGIN: Loading Animation -->
-                    <div><i class="fas fa-spinner fa-spin"></i></div>
-                </div>
-                <!-- END: Loading Animation -->
-            </div>
-        </div>
-        <div class="div-row center"
-            style="border: solid 1px black; margin: 20px; background: #eee; padding: 10px; gap: 10px">
-            <div>Prompt:</div>
-            <input type="text" style="background: #fdd; border: solid 1px red; width: 100%; padding: 10px"
-                :value="currentInput" @input="handleTextInput" v-on:keyup.enter="sendToOllama(currentInput)"></input>
-            <button class="button" @click="sendToOllama(currentInput)">Send</button>
-            <button class="button" @click="cancelSpeaking()">Stop</button>
         </div>
     </div>
     <script>
