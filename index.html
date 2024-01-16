@@ -53,6 +53,13 @@
         <div class="div-col center">
             <div class="div-col center">
                 <div class="div-row center" style="margin: 10px; background: #eee; padding: 10px; border: solid 1px black; gap: 20px">
+                    <div class="bold">PORT</div>
+                    <select id="portDropdown" style="min-height: 40px; min-width: 500px;">
+                        <option value="11434">11434</option>
+                        <option selected value="11435">11435</option>
+                    </select>
+                </div>
+                <div class="div-row center" style="margin: 10px; background: #eee; padding: 10px; border: solid 1px black; gap: 20px">
                     <div class="bold">VOICE</div>
                     <select id="voicesDropdown" style="min-height: 40px; min-width: 500px;">
                         <option v-if="speechSynthesisVoices.length == 0" value="">Select a voice</option>
@@ -247,7 +254,7 @@
                     });
 
                     // Send the request using Fetch API
-                    fetch("http://localhost:11434/api/chat", {
+                    fetch("http://localhost:" + portDropdown.value + "/api/chat", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json"
