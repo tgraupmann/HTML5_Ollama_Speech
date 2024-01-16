@@ -1,4 +1,6 @@
-# HTML5_Ollama_Speech - HTML5 Example - Speech interface to the Ollama API
+# HTML5_Ollama_Speech
+
+* This HTML5 example uses the Ollama REST API and the browser Speech API to add speech detection and speech synthesis for [Ollama](https://ollama.ai).
 
 ## Screenshots
 
@@ -6,6 +8,6 @@
 
 ## Dependencies
 
-* [Ollama](https://ollama.ai) REST API
+* [Ollama](https://ollama.ai) [REST API](https://github.com/jmorganca/ollama/blob/main/docs/api.md#generate-a-chat-completion)
 
 * Browser ([Chrome](https://www.google.com/chrome/) Recommended)
