@@ -2,6 +2,8 @@
 
 * This HTML5 example uses the Ollama REST API and the browser Speech API to add speech detection and speech synthesis for [Ollama](https://ollama.ai).
 
+* [Web Demo](https://tgraupmann.github.io/HTML5_Ollama_Speech/)
+
 ## Screenshots
 
 ![image_1](/images/image_1.png)
