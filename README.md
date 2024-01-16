@@ -73,11 +73,19 @@ vi /etc/nginx/sites-available/default
 server {
  listen 11435;
  location / {
+   if ($request_method = 'OPTIONS') {
+     add_header 'Access-Control-Allow-Origin' '*';
+     add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+     add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range';
+     add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
+     return 204;
+   }
    proxy_pass http://localhost:11434;
  }
- proxy_hide_header 'Access-Control-Allow-Origin';
- add_header Access-Control-Allow-Origin "*";
-}  
+ proxy_hide_header 'Origin';
+ proxy_set_header 'Origin' "https://localhost:11434";
+ add_header 'Access-Control-Allow-Origin' '*';
+}
 ```
 
 * Test if the configuration changes are okay.
