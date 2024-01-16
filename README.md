@@ -82,9 +82,17 @@ server {
    }
    proxy_pass http://localhost:11434;
  }
+ proxy_hide_header 'Access-Control-Allow-Origin';
+ proxy_set_header 'Access-Control-Allow-Origin' "*";
+ proxy_hide_header 'Content-Type';
+ proxy_set_header 'Content-Type' "application/json";
  proxy_hide_header 'Origin';
  proxy_set_header 'Origin' "https://localhost:11434";
  add_header 'Access-Control-Allow-Origin' '*';
+ proxy_hide_header 'Sec-Fetch-Mode';
+ proxy_hide_header 'Sec-Fetch-Site';
+ proxy_hide_header 'Sec-Fetch-Dest';
+ proxy_hide_header 'Origin';
 }
 ```
 
