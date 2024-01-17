@@ -78,13 +78,14 @@
                                     @click="handleDeleteHistoryItem(index)"><i class="fa fa-trash"
                                         aria-hidden="true"></i></button>
                                 <button class="button" @click="sendToOllama(item.input)">Send</button>
+                                <button class="button" @click="sendToOllama('Summarize the following as a single paragraph. ' + item.output)">Summarize</button>
                                 <button class="button" @click="speak(item.output)">Play</button>
                                 <button class="button" @click="cancelSpeaking()">Stop</button>
                             </div>
                             <div class="div-row">
-                                <input type="text"
+                                <textarea ref="txtHistoryInput" disabled cols="120" rows="5"
                                     style="margin: 5px; padding: 10px; width: 100%; background: #ffd; border: solid 1px black"
-                                    :value="item.input"></input>
+                                    :value="item.input"></textarea>
                             </div>
                             <div class="div-row">
                                 <textarea ref="txtHistoryOutput" disabled cols="120" rows="5"
@@ -95,7 +96,7 @@
                 </div>
                 <div v-for="(content, index) in pendingPrompts" :index="index" class="div-row center"
                     style="align-items: center; border: solid 1px black; background: #ffd; padding: 20px; gap: 20px">
-                    <div>{{ content }} </div>
+                    <div style="max-width: 600px">{{ content }}</div>
                     <div class="div-row center" style="margin: 20px">
                         <!-- BEGIN: Loading Animation -->
                         <div><i class="fas fa-spinner fa-spin"></i></div>
@@ -132,6 +133,7 @@
                 resizeTextAreaHistory(index) {
                     var refThis = this;
                     setTimeout(function () {
+                        refThis.$refs['txtHistoryInput'][index].style.height = refThis.$refs['txtHistoryInput'][index].scrollHeight + 'px';
                         refThis.$refs['txtHistoryOutput'][index].style.height = refThis.$refs['txtHistoryOutput'][index].scrollHeight + 'px';
                     }, 0);
                 },
