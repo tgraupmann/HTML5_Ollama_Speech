@@ -34,6 +34,28 @@ docker exec -it ollama ollama run llama2
 
 You can create a new Ollama container to add a `nginx` proxy with the required header. If you don't want to use the proxy, just clone the repository and use the live-preview VS Code extension to preview the index.html and it will work without the header. In the future it would be better to modify the client Golang code to add the header so that websites can talk directly to the Ollama REST API.
 
+### Use docker composer
+
+* You can use the exsiting docker composer settings to setup the Ollama + NGINX Proxy
+
+* Step 1) Build the docker container
+
+```shell
+docker compose up --build
+```
+
+* Step 2) Install the `llama2` model:
+
+```shell
+docker exec -it ollama ollama run llama2
+```
+
+* Step 3) Try the [Web Demo](https://tgraupmann.github.io/HTML5_Ollama_Speech/)
+
+### Manual steps
+
+* Or you can use apt-get to install `nginx` inside the Ollama container.
+
 * First recreate the docker container with an additional port for the `nginx` proxy.
 
 ```shell
