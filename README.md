@@ -38,19 +38,26 @@ You can create a new Ollama container to add a `nginx` proxy with the required h
 
 * You can use the exsiting docker composer settings to setup the Ollama + NGINX Proxy
 
-* Step 1) Build the docker container
+* Step 1) Setup your environment and rename `.env.example` to `.env`. Pick your ports or use the defaults.
+
+```js
+NGINX_PORT=11435
+OLLAMA_PORT=11434
+```
+
+* Step 2) Build the docker container
 
 ```shell
 docker compose up --build
 ```
 
-* Step 2) Install the `llama2` model:
+* Step 3) Install the `llama2` model:
 
 ```shell
 docker exec -it ollama ollama run llama2
 ```
 
-* Step 3) Try the [Web Demo](https://tgraupmann.github.io/HTML5_Ollama_Speech/)
+* Step 4) Try the [Web Demo](https://tgraupmann.github.io/HTML5_Ollama_Speech/)
 
 ### Manual steps
 
