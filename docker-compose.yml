@@ -1,0 +1,60 @@
+version: '3.9'
+networks:
+    ai_net:
+services:
+    nginx:
+        container_name: nginx
+        environment:
+            DEBUG_COLORS: "true"
+            TERM: "xterm-256color"
+            COLORTERM: "truecolor"
+            CHOKIDAR_USEPOLLING: "1"
+            OS: "${OS}"
+        expose:
+            - '${NGINX_PORT}:${NGINX_PORT}/tcp'
+        build:
+            context: ./nginx
+            dockerfile: Dockerfile
+        image: nginx
+        restart: unless-stopped
+        networks:
+            - ai_net
+        ports:
+            - "${NGINX_PORT}:${NGINX_PORT}/tcp"
+        volumes:
+            - ./nginx/html:/usr/share/nginx/html:ro
+            - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    ollama:
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        -   driver: nvidia
+                            count: 1
+                            capabilities: [ gpu ]
+        environment:
+            NVIDIA_DISABLE_REQUIRE: "1"
+            NVIDIA_VISIBLE_DEVICES: "all"
+            DEBUG_COLORS: "true"
+            TERM: "xterm-256color"
+            COLORTERM: "truecolor"
+            CHOKIDAR_USEPOLLING: "1"
+            OS: "${OS}"
+            GIN_MODE: "release"
+            OLLAMA_PORT: "${OLLAMA_PORT}"
+
+        #ollama port is not accessible outside:
+        expose:
+            - '${OLLAMA_PORT}:${OLLAMA_PORT}/tcp'
+        build:
+            context: ./ollama
+            dockerfile: Dockerfile
+        ports:
+            - "${OLLAMA_PORT}:${OLLAMA_PORT}/tcp"
+        image: ollama
+        container_name: ollama
+        restart: unless-stopped
+        volumes:
+            - ./models:/root/.ollama:rw
+        networks:
+            - ai_net
